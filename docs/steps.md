@@ -26,7 +26,7 @@
 2. Initialize or reopen store from `--dir` and print recovery line on startup:
    `Recovered X keys in Y seconds`.
 3. Start worker pool using configured thread count.
-4. Implement `demo monitor --port=8081` command skeleton and endpoint connectivity.
+4. Implement `demo monitor --port=8080` command skeleton and endpoint connectivity.
 
 ## 4. Metrics and Observability
 1. Register required monitoring metrics via HestiaStore Monitoring API and its Micrometer bridge.

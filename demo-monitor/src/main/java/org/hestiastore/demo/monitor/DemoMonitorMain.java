@@ -7,7 +7,17 @@ public final class DemoMonitorMain {
     }
 
     public static void main(String[] args) {
-        int exitCode = new CommandLine(new DemoMonitorRootCommand()).execute(args);
+        CommandLine commandLine = new CommandLine(new DemoMonitorRootCommand());
+        commandLine.setExecutionExceptionHandler((exception, cmd, parseResult) -> {
+            String message = exception.getMessage();
+            if (message == null || message.isBlank()) {
+                message = "monitor startup failed";
+            }
+            cmd.getErr().println("ERROR: " + message);
+            return cmd.getCommandSpec().exitCodeOnExecutionException();
+        });
+
+        int exitCode = commandLine.execute(args);
         System.exit(exitCode);
     }
 }

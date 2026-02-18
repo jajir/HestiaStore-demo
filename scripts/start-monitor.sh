@@ -4,7 +4,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-PORT="${PORT:-8081}"
+PORT="${PORT:-8080}"
 TARGET="${TARGET:-http://localhost:9090}"
 BACKEND_PORT="${BACKEND_PORT:-8085}"
 WRITE_TOKEN="${WRITE_TOKEN:-}"

@@ -9,13 +9,21 @@ import io.micrometer.core.instrument.binder.jvm.JvmMemoryMetrics;
 import io.micrometer.core.instrument.binder.jvm.JvmThreadMetrics;
 import io.micrometer.prometheusmetrics.PrometheusConfig;
 import io.micrometer.prometheusmetrics.PrometheusMeterRegistry;
+import org.hestiastore.management.api.ActionResponse;
+import org.hestiastore.management.api.ActionRequest;
+import org.hestiastore.management.api.ActionStatus;
+import org.hestiastore.management.api.ActionType;
+import org.hestiastore.management.api.MetricsResponse;
+import org.hestiastore.management.api.NodeStateResponse;
 import org.hestiastore.demo.core.RuntimeMetricsSnapshot;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 
 public final class RunnerServer {
@@ -53,6 +61,10 @@ public final class RunnerServer {
         httpServer.createContext("/metrics", this::handleMetrics);
         httpServer.createContext("/node/detail", this::handleNodeDetail);
         httpServer.createContext("/node/config", this::handleNodeConfig);
+        httpServer.createContext("/api/v1/state", this::handleApiState);
+        httpServer.createContext("/api/v1/metrics", this::handleApiMetrics);
+        httpServer.createContext("/api/v1/actions/flush", exchange -> handleAction(exchange, ActionType.FLUSH));
+        httpServer.createContext("/api/v1/actions/compact", exchange -> handleAction(exchange, ActionType.COMPACT));
         httpServer.start();
     }
 
@@ -97,6 +109,65 @@ public final class RunnerServer {
         payload.put("descriptions", NodeConfigMetadata.descriptions());
         byte[] body = objectMapper.writeValueAsBytes(payload);
         writeResponse(exchange, 200, "application/json", body);
+    }
+
+    private void handleApiState(HttpExchange exchange) throws IOException {
+        NodeStateResponse stateResponse = new NodeStateResponse(
+                indexName(),
+                latestSnapshot == null ? "STARTING" : "RUNNING",
+                latestSnapshot != null,
+                Instant.now()
+        );
+        byte[] body = objectMapper.writeValueAsBytes(stateResponse);
+        writeResponse(exchange, 200, "application/json", body);
+    }
+
+    private void handleApiMetrics(HttpExchange exchange) throws IOException {
+        RuntimeMetricsSnapshot snapshot = latestSnapshot;
+        MetricsResponse response = new MetricsResponse(
+                indexName(),
+                snapshot == null ? "STARTING" : "RUNNING",
+                snapshot == null ? 0L : snapshot.totalGte(),
+                snapshot == null ? 0L : snapshot.totalPut(),
+                snapshot == null ? 0L : snapshot.totalDelete(),
+                Instant.now()
+        );
+        byte[] body = objectMapper.writeValueAsBytes(response);
+        writeResponse(exchange, 200, "application/json", body);
+    }
+
+    private void handleAction(HttpExchange exchange, ActionType actionType) throws IOException {
+        if (!"POST".equalsIgnoreCase(exchange.getRequestMethod())) {
+            writeResponse(exchange, 405, "application/json", "{\"code\":\"METHOD_NOT_ALLOWED\"}".getBytes(StandardCharsets.UTF_8));
+            return;
+        }
+
+        ActionRequest actionRequest;
+        try {
+            actionRequest = objectMapper.readValue(exchange.getRequestBody(), ActionRequest.class);
+        } catch (Exception e) {
+            actionRequest = new ActionRequest(UUID.randomUUID().toString());
+        }
+
+        ActionResponse response = new ActionResponse(
+                actionRequest.requestId(),
+                actionType,
+                ActionStatus.COMPLETED,
+                "Completed in demo mode.",
+                Instant.now()
+        );
+        byte[] body = objectMapper.writeValueAsBytes(response);
+        writeResponse(exchange, 200, "application/json", body);
+    }
+
+    private String indexName() {
+        if (latestSnapshot != null) {
+            Object value = latestSnapshot.nodeConfig().get("indexName");
+            if (value != null) {
+                return value.toString();
+            }
+        }
+        return "hestia-demo-index";
     }
 
     private void writeResponse(HttpExchange exchange, int statusCode, String contentType, byte[] body) throws IOException {

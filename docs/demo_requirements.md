@@ -99,7 +99,7 @@ Responsibilities:
 ### 5.2 Monitor Command
 
 ```bash
-demo monitor --port=8081
+demo monitor --port=8080
 ```
 
 Responsibilities:

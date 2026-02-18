@@ -7,6 +7,8 @@ import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
 import java.net.URI;
+import java.net.InetSocketAddress;
+import java.net.ServerSocket;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
@@ -15,10 +17,11 @@ import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
 
 @Command(name = "monitor", description = "Run monitor dashboard")
 public final class MonitorCommand implements Runnable {
-    @Option(names = "--port", defaultValue = "8081")
+    @Option(names = "--port", defaultValue = "8080")
     private int webPort;
 
     @Option(names = "--backend-port", defaultValue = "8085")
@@ -38,8 +41,16 @@ public final class MonitorCommand implements Runnable {
 
     @Override
     public void run() {
+        MonitoringConsoleServer backend = null;
         try {
-            MonitoringConsoleServer backend = new MonitoringConsoleServer("127.0.0.1", backendPort, writeToken);
+            if (webPort == backendPort) {
+                throw new IllegalArgumentException("--port and --backend-port must be different values.");
+            }
+
+            assertPortAvailable(webPort, "web port");
+            assertPortAvailable(backendPort, "backend port");
+
+            backend = new MonitoringConsoleServer("127.0.0.1", backendPort, writeToken);
             Runtime.getRuntime().addShutdownHook(new Thread(backend::close));
             backend.start();
 
@@ -59,7 +70,19 @@ public final class MonitorCommand implements Runnable {
             System.out.printf("Registered node: id=%s name=%s target=%s%n", resolvedNodeId, nodeName, target);
 
             MonitoringConsoleWebApplication.main(new String[0]);
+
+            // Keep process alive if web launcher returns after startup.
+            new CountDownLatch(1).await();
+        } catch (InterruptedException interruptedException) {
+            Thread.currentThread().interrupt();
+        } catch (IllegalStateException illegalStateException) {
+            throw illegalStateException;
+        } catch (IllegalArgumentException illegalArgumentException) {
+            throw illegalArgumentException;
         } catch (Exception e) {
+            if (backend != null) {
+                backend.close();
+            }
             throw new RuntimeException("Monitor startup failed", e);
         }
     }
@@ -95,5 +118,17 @@ public final class MonitorCommand implements Runnable {
             return input.substring(0, input.length() - 1);
         }
         return input;
+    }
+
+    private void assertPortAvailable(int port, String label) {
+        try (ServerSocket socket = new ServerSocket()) {
+            socket.setReuseAddress(false);
+            socket.bind(new InetSocketAddress("127.0.0.1", port));
+        } catch (Exception e) {
+            throw new IllegalStateException(
+                    String.format("Cannot start monitor: %s %d is already in use on 127.0.0.1.", label, port),
+                    e
+            );
+        }
     }
 }

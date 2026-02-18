@@ -78,9 +78,9 @@ java -jar demo-runner/target/demo-runner-0.1.0-SNAPSHOT.jar run \
 ## Run Monitor
 ```bash
 java -jar demo-monitor/target/demo-monitor-0.1.0-SNAPSHOT.jar monitor \
-  --port=8081 \
+  --port=8080 \
   --backend-port=8085 \
   --target=http://localhost:9090
 ```
 
-Open `http://localhost:8081`.
+Open `http://localhost:8080`.

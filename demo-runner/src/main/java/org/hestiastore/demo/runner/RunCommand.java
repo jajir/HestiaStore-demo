@@ -1,6 +1,7 @@
 package org.hestiastore.demo.runner;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
 import org.hestiastore.demo.core.DemoConfiguration;
 import org.hestiastore.demo.core.DemoMetrics;
 import org.hestiastore.demo.core.InMemoryStore;
@@ -40,6 +41,8 @@ public final class RunCommand implements Runnable {
     @Override
     public void run() {
         ObjectMapper objectMapper = new ObjectMapper();
+        objectMapper.findAndRegisterModules();
+        objectMapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
         RunnerStateStore stateStore = new RunnerStateStore(objectMapper);
         RunnerState state = stateStore.load(directory);
 
