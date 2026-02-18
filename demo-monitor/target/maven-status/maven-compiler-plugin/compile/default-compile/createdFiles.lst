@@ -1,0 +1,3 @@
+org/hestiastore/demo/monitor/DemoMonitorMain.class
+org/hestiastore/demo/monitor/MonitorCommand.class
+org/hestiastore/demo/monitor/DemoMonitorRootCommand.class

@@ -1,0 +1,66 @@
+@startuml
+skinparam componentStyle rectangle
+skinparam shadowing false
+left to right direction
+
+actor "Operator" as Operator
+actor "Browser" as Browser
+
+node "JVM #1\nRunner Process" as RunnerJVM {
+  artifact "demo-runner.jar" as RunnerJar
+
+  package "Loaded jars/modules" {
+    [demo-core.jar] as DemoCore
+    [hestiastore-*.jar] as HestiaLib
+    [HestiaStore Monitoring API] as MonApi
+    [HestiaStore Monitoring Micrometer] as MonMic
+    [HestiaStore Monitoring Prometheus] as MonProm
+    [HestiaStore Management API] as MgmtApi
+    [HestiaStore Management Agent] as MgmtAgent
+    [picocli-*.jar] as Pico
+    [jdk.httpserver / undertow] as HttpSrv
+  }
+
+  component "Workload Engine\n- Worker pool\n- Zipf selector\n- GTE/PUT/DELETE mix" as Workload
+  component "Store Adapter\n- open/recover\n- read/write/delete" as StoreAdapter
+  component "Metrics Publisher\n- counters/timers\n- /metrics endpoint" as Metrics
+  component "Management Publisher\n- config/state endpoints\n- /node/config" as Mgmt
+  component "Console Reporter\n- 5s stats print" as Console
+}
+
+database "Data Directory\n(--dir)" as DataDir
+
+node "JVM #2\nMonitor Process" as MonitorJVM {
+  artifact "demo-monitor.jar" as MonitorJar
+  component "Metrics Client\n- scrape/poll runner metrics" as MetricsClient
+  component "Management Client\n- pull runner config/state" as MgmtClient
+  component "Dashboard Server\n- charts\n- node detail (GTE/PUT/DELETE totals + current/sec)\n- bloom hits/misses/ratio" as Dashboard
+  package "Loaded jars/modules" {
+    [HestiaStore Monitoring Console] as MonConsole
+    [HestiaStore Monitoring Console Web] as MonConsoleWeb
+  }
+}
+
+cloud "Optional\nPrometheus" as Prom
+
+Operator --> RunnerJar : `demo run ...`
+Operator --> MonitorJar : `demo monitor --port=8081`
+
+RunnerJar --> Workload
+RunnerJar --> StoreAdapter
+RunnerJar --> Metrics
+RunnerJar --> Mgmt
+RunnerJar --> Console
+Workload --> StoreAdapter
+StoreAdapter --> DataDir : read/write segments
+Metrics --> HttpSrv : expose /metrics
+Mgmt --> HttpSrv : expose /node/config + mgmt API
+
+MetricsClient --> HttpSrv : HTTP pull /metrics
+MgmtClient --> HttpSrv : HTTP pull /node/config
+Dashboard --> MetricsClient
+Dashboard --> MgmtClient
+Browser --> Dashboard : HTTP UI
+Prom --> HttpSrv : HTTP scrape /metrics
+
+@enduml
